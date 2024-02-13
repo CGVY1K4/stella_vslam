@@ -32,6 +32,9 @@ public:
      * Save the keyframe trajectory in the specified format
      */
     void save_keyframe_trajectory(const std::string& path, const std::string& format) const;
+    ////////////////////////////////////////////////////////////////////////////////
+    void save_map_points_with_keyframe_pose(const std::string& path) const;
+    ////////////////////////////////////////////////////////////////////////////////
 
 private:
     //! map_database

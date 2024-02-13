@@ -2,6 +2,7 @@
 #include "stella_vslam/data/map_database.h"
 #include "stella_vslam/io/trajectory_io.h"
 #include "stella_vslam/util/converter.h"
+#include "stella_vslam/data/landmark.h"
 
 #include <iostream>
 #include <iomanip>
@@ -81,7 +82,7 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
         Mat44_t cam_pose_wc = util::converter::inverse_pose(cam_pose_cw);
 
         if (format == "KITTI") {
-            ofs << std::setprecision(9)
+            ofs << std::setprecision(6)
                 << cam_pose_wc(0, 0) << " " << cam_pose_wc(0, 1) << " " << cam_pose_wc(0, 2) << " " << cam_pose_wc(0, 3) << " "
                 << cam_pose_wc(1, 0) << " " << cam_pose_wc(1, 1) << " " << cam_pose_wc(1, 2) << " " << cam_pose_wc(1, 3) << " "
                 << cam_pose_wc(2, 0) << " " << cam_pose_wc(2, 1) << " " << cam_pose_wc(2, 2) << " " << cam_pose_wc(2, 3) << std::endl;
@@ -90,9 +91,9 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
             const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
             const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
             const Quat_t quat_wc = Quat_t(rot_wc);
-            ofs << std::setprecision(15)
+            ofs << std::setprecision(7) //15
                 << timestamps.at(frm_id) << " "
-                << std::setprecision(9)
+                << std::setprecision(7) //9
                 << trans_wc(0) << " " << trans_wc(1) << " " << trans_wc(2) << " "
                 << quat_wc.x() << " " << quat_wc.y() << " " << quat_wc.z() << " " << quat_wc.w() << std::endl;
         }
@@ -156,9 +157,9 @@ void trajectory_io::save_keyframe_trajectory(const std::string& path, const std:
             const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
             const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
             const Quat_t quat_wc = Quat_t(rot_wc);
-            ofs << std::setprecision(15)
+            ofs << std::setprecision(7) //15
                 << timestamp << " "
-                << std::setprecision(9)
+                << std::setprecision(7) //11 
                 << trans_wc(0) << " " << trans_wc(1) << " " << trans_wc(2) << " "
                 << quat_wc.x() << " " << quat_wc.y() << " " << quat_wc.z() << " " << quat_wc.w() << std::endl;
         }
@@ -169,6 +170,52 @@ void trajectory_io::save_keyframe_trajectory(const std::string& path, const std:
 
     ofs.close();
 }
+
+void trajectory_io::save_map_points_with_keyframe_pose(const std::string& path) const {
+    std::lock_guard<std::mutex> lock(data::map_database::mtx_database_);
+    assert(map_db_);
+    auto landmarks = map_db_->get_all_landmarks(); // 모든 랜드마크들을 가져옵니다.
+
+    std::ofstream ofs(path, std::ios::out);
+    if (!ofs.is_open()) {
+        spdlog::critical("cannot create a file at {}", path);
+        throw std::runtime_error("cannot create a file at " + path);
+    }
+
+    ofs << std::fixed;
+    for (const auto& lm : landmarks) {
+
+        // 관측 정보가 없는 랜드마크는 건너뜁니다.
+        if (lm->num_observations() == 0) {
+            continue;
+        }
+
+        // 랜드마크의 세계 좌표를 저장합니다.
+        const Vec3_t pos_w = lm->get_pos_in_world();
+        ofs << pos_w.transpose() << " "; // Eigen 벡터를 파일에 출력합니다.
+
+        // 랜드마크의 관측 정보를 가져옵니다.
+        auto observations = lm->get_observations();
+        for (const auto& obs_pair : observations) {
+            auto keyfrm_ptr = obs_pair.first.lock();
+            if (!keyfrm_ptr) {
+                continue; // 키 프레임이 유효하지 않다면 건너뜁니다.
+            }
+
+            // 키 프레임의 타임스탬프를 저장합니다.
+            ofs << std::setprecision(6) << keyfrm_ptr->timestamp_ << " ";
+        }
+
+        ofs << std::endl; // 랜드마크당 한 줄로 구분
+    }
+
+    ofs.close();
+    std::cout << "Saved " << landmarks.size() << " landmarks with keyframe poses to " << path << std::endl;
+}
+
+
+
+
 
 } // namespace io
 } // namespace stella_vslam

@@ -79,6 +79,9 @@ public:
     //! Save the keyframe trajectory in the specified format
     void save_keyframe_trajectory(const std::string& path, const std::string& format) const;
 
+    //! Save the map point
+    void save_map_points_with_keyframe_pose(const std::string& path) const;
+
     //! Load the map database from file
     bool load_map_database(const std::string& path) const;
 
