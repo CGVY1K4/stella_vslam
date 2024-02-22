@@ -63,7 +63,7 @@ system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file
     // tracking module
     tracker_ = new tracking_module(cfg_, camera_, map_db_, bow_vocab_, bow_db_);
     // mapping module
-    mapper_ = new mapping_module(cfg_->yaml_node_["Mapping"], map_db_, bow_db_, bow_vocab_);
+    mapper_ = new mapping_module(util::yaml_optional_ref(cfg_->yaml_node_, "Mapping"), map_db_, bow_db_, bow_vocab_);
     // global optimization module
     global_optimizer_ = new global_optimization_module(map_db_, bow_db_, bow_vocab_, cfg_->yaml_node_, camera_->setup_type_ != camera::setup_type_t::Monocular);
 
@@ -301,7 +301,6 @@ data::frame system::create_monocular_frame(const cv::Mat& img, const double time
     // Extract ORB feature
     keypts_.clear();
     extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
-    frm_obs.num_keypts_ = keypts_.size();
     if (keypts_.empty()) {
         spdlog::warn("preprocess: cannot extract any keypoints");
     }
@@ -353,7 +352,6 @@ data::frame system::create_stereo_frame(const cv::Mat& left_img, const cv::Mat& 
     });
     thread_left.join();
     thread_right.join();
-    frm_obs.num_keypts_ = keypts_.size();
     if (keypts_.empty()) {
         spdlog::warn("preprocess: cannot extract any keypoints");
     }
@@ -401,7 +399,6 @@ data::frame system::create_RGBD_frame(const cv::Mat& rgb_img, const cv::Mat& dep
     // Extract ORB feature
     keypts_.clear();
     extractor_left_->extract(img_gray, mask, keypts_, frm_obs.descriptors_);
-    frm_obs.num_keypts_ = keypts_.size();
     if (keypts_.empty()) {
         spdlog::warn("preprocess: cannot extract any keypoints");
     }
@@ -411,10 +408,10 @@ data::frame system::create_RGBD_frame(const cv::Mat& rgb_img, const cv::Mat& dep
 
     // Calculate disparity from depth
     // Initialize with invalid value
-    frm_obs.stereo_x_right_ = std::vector<float>(frm_obs.num_keypts_, -1);
-    frm_obs.depths_ = std::vector<float>(frm_obs.num_keypts_, -1);
-
-    for (unsigned int idx = 0; idx < frm_obs.num_keypts_; idx++) {
+    frm_obs.stereo_x_right_ = std::vector<float>(frm_obs.undist_keypts_.size(), -1);
+    frm_obs.depths_ = std::vector<float>(frm_obs.undist_keypts_.size(), -1);
+    
+    for (unsigned int idx = 0; idx < frm_obs.undist_keypts_.size(); idx++) {
         const auto& keypt = keypts_.at(idx);
         const auto& undist_keypt = frm_obs.undist_keypts_.at(idx);
 

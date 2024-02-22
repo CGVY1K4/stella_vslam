@@ -32,8 +32,6 @@ struct frame_observation {
     std::vector<float> depths_;
     //! keypoint indices in each of the cells
     std::vector<std::vector<std::vector<unsigned int>>> keypt_indices_in_cells_;
-
-    unsigned int num_keypts_;
 };
 
 } // namespace data
